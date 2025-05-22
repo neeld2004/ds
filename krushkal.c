@@ -1,141 +1,168 @@
 #include <stdio.h>
 #include <stdlib.h>
+
 #define MAX 100
-#define INF 99999
-// Edge structure for Kruskal
-typedef struct {
-    int u, v, weight;
-} Edge;
-// Disjoint Set Union (Union-Find) for cycle detection
+
+// Edge structure
+struct Edge {
+    int src, dest, weight;
+};
+
+// Adjacency List Node
+struct Node {
+    int dest, weight;
+    struct Node* next;
+};
+
+// Disjoint Set (Union-Find)
 int parent[MAX];
-void makeSet(int n) {
-    for (int i = 0; i < n; i++) parent[i] = i;
+
+int find(int i) {
+    if (parent[i] != i)
+        parent[i] = find(parent[i]);
+    return parent[i];
 }
-int findParent(int x) {
-    if (parent[x] == x) return x;
-    return parent[x] = findParent(parent[x]);
+
+void unionSet(int u, int v) {
+    int uRoot = find(u);
+    int vRoot = find(v);
+    parent[uRoot] = vRoot;
 }
-void unionSet(int a, int b) {
-    a = findParent(a);
-    b = findParent(b);
-    if (a != b) parent[b] = a;
+
+// Compare function for qsort
+int compareEdges(const void* a, const void* b) {
+    return ((struct Edge*)a)->weight - ((struct Edge*)b)->weight;
 }
-// Function to sort edges by weight (for Kruskal)
-int compare(const void* a, const void* b) {
-    Edge* e1 = (Edge*)a;
-    Edge* e2 = (Edge*)b;
-    return e1->weight - e2->weight;
-}
-// Kruskal using adjacency matrix
-void kruskalMatrix(int n, int graph[n][n]) {
-    Edge edges[MAX * MAX];
+
+// ---------------- Matrix Implementation ----------------
+void kruskalMatrix(int graph[MAX][MAX], int V) {
+    struct Edge edges[MAX * MAX];
     int edgeCount = 0;
-    // Extract edges from upper triangular matrix (undirected)
-    for (int i = 0; i < n; i++)
-        for (int j = i+1; j < n; j++)
-            if (graph[i][j] != 0 && graph[i][j] != INF) {
-                edges[edgeCount].u = i;
-                edges[edgeCount].v = j;
+
+    // Convert matrix to edge list
+    for (int i = 0; i < V; i++) {
+        for (int j = i + 1; j < V; j++) {
+            if (graph[i][j]) {
+                edges[edgeCount].src = i;
+                edges[edgeCount].dest = j;
                 edges[edgeCount].weight = graph[i][j];
                 edgeCount++;
             }
-    qsort(edges, edgeCount, sizeof(Edge), compare);
-    makeSet(n);
-    printf("Edges in MST (Kruskal - Matrix):\n");
-    int mstWeight = 0;
-    for (int i = 0; i < edgeCount; i++) {
-        int u = edges[i].u;
-        int v = edges[i].v;
-        if (findParent(u) != findParent(v)) {
-            unionSet(u, v);
-            printf("(%d - %d) : %d\n", u, v, edges[i].weight);
-            mstWeight += edges[i].weight;
         }
     }
-    printf("Total weight of MST: %d\n", mstWeight);
+
+    // Sort edges by weight
+    qsort(edges, edgeCount, sizeof(struct Edge), compareEdges);
+
+    for (int i = 0; i < V; i++) parent[i] = i;
+
+    printf("\nMST using Adjacency Matrix:\n");
+    int mstCost = 0, count = 0;
+    for (int i = 0; i < edgeCount && count < V - 1; i++) {
+        int u = edges[i].src, v = edges[i].dest;
+        if (find(u) != find(v)) {
+            unionSet(u, v);
+            printf("Edge (%d - %d) Cost: %d\n", u, v, edges[i].weight);
+            mstCost += edges[i].weight;
+            count++;
+        }
+    }
+
+    printf("Total Cost: %d\n", mstCost);
 }
-// Adjacency list node for graph edges
-typedef struct AdjNode {
-    int vertex, weight;
-    struct AdjNode* next;
-} AdjNode;
-// Add edge in adjacency list
-void addEdgeList(AdjNode* adj[], int u, int v, int w) {
-    AdjNode* newNode = (AdjNode*)malloc(sizeof(AdjNode));
-    newNode->vertex = v;
-    newNode->weight = w;
-    newNode->next = adj[u];
-    adj[u] = newNode;
+
+// ---------------- List Implementation ----------------
+struct Node* createNode(int dest, int weight) {
+    struct Node* newNode = (struct Node*)malloc(sizeof(struct Node));
+    newNode->dest = dest;
+    newNode->weight = weight;
+    newNode->next = NULL;
+    return newNode;
 }
-// Convert adjacency list to edge array
-int extractEdgesFromList(AdjNode* adj[], Edge edges[], int n) {
-    int count = 0;
-    int visited[MAX][MAX] = {0};
-    for (int i = 0; i < n; i++) {
-        AdjNode* curr = adj[i];
-        while (curr) {
-            int u = i;
-            int v = curr->vertex;
-            if (!visited[u][v] && !visited[v][u]) {
-                edges[count].u = u;
-                edges[count].v = v;
-                edges[count].weight = curr->weight;
-                count++;
-                visited[u][v] = visited[v][u] = 1;
+
+void addEdge(struct Node* adj[], int u, int v, int w) {
+    struct Node* node = createNode(v, w);
+    node->next = adj[u];
+    adj[u] = node;
+
+    node = createNode(u, w); // Since undirected
+    node->next = adj[v];
+    adj[v] = node;
+}
+
+void kruskalList(struct Node* adj[], int V) {
+    struct Edge edges[MAX * MAX];
+    int edgeCount = 0;
+
+    int added[MAX][MAX] = {0}; // to avoid duplicate undirected edges
+
+    // Convert list to edge list
+    for (int u = 0; u < V; u++) {
+        struct Node* temp = adj[u];
+        while (temp) {
+            int v = temp->dest;
+            if (!added[u][v] && !added[v][u]) {
+                edges[edgeCount++] = (struct Edge){u, v, temp->weight};
+                added[u][v] = added[v][u] = 1;
             }
-            curr = curr->next;
+            temp = temp->next;
         }
     }
-    return count;
-}
-// Kruskal using adjacency list
-void kruskalList(AdjNode* adj[], int n) {
-    Edge edges[MAX * MAX];
-    int edgeCount = extractEdgesFromList(adj, edges, n);
-    qsort(edges, edgeCount, sizeof(Edge), compare);
-    makeSet(n);
-    printf("Edges in MST (Kruskal - List):\n");
-    int mstWeight = 0;
-    for (int i = 0; i < edgeCount; i++) {
-        int u = edges[i].u;
-        int v = edges[i].v;
-        if (findParent(u) != findParent(v)) {
+
+    qsort(edges, edgeCount, sizeof(struct Edge), compareEdges);
+
+    for (int i = 0; i < V; i++) parent[i] = i;
+
+    printf("\nMST using Adjacency List:\n");
+    int mstCost = 0, count = 0;
+    for (int i = 0; i < edgeCount && count < V - 1; i++) {
+        int u = edges[i].src, v = edges[i].dest;
+        if (find(u) != find(v)) {
             unionSet(u, v);
-            printf("(%d - %d) : %d\n", u, v, edges[i].weight);
-            mstWeight += edges[i].weight;
+            printf("Edge (%d - %d) Cost: %d\n", u, v, edges[i].weight);
+            mstCost += edges[i].weight;
+            count++;
         }
     }
-    printf("Total weight of MST: %d\n", mstWeight);
+
+    printf("Total Cost: %d\n", mstCost);
 }
+
+// ---------------- Main ----------------
 int main() {
-    int n, choice, repr;
+    int V, E, choice;
     printf("Enter number of vertices: ");
-    scanf("%d", &n);
-    printf("Choose representation:\n1. Adjacency Matrix\n2. Adjacency List\n");
-    scanf("%d", &repr);
-    if (repr == 1) {
-        int graph[n][n];
-        printf("Enter adjacency matrix (use 0 for no edge):\n");
-        for (int i = 0; i < n; i++)
-            for (int j = 0; j < n; j++) {
-                scanf("%d", &graph[i][j]);
-                if (graph[i][j] == 0) graph[i][j] = INF; // Mark no edge
-            }
-        kruskalMatrix(n, graph);
-    } else if (repr == 2) {
-        AdjNode* adj[n];
-        for (int i = 0; i < n; i++) adj[i] = NULL;
-        printf("Enter edges (u v weight). Enter -1 -1 -1 to stop:\n");
-        while (1) {
+    scanf("%d", &V);
+
+    printf("Choose graph representation:\n1. Adjacency Matrix\n2. Adjacency List\nEnter choice: ");
+    scanf("%d", &choice);
+
+    if (choice == 1) {
+        int graph[MAX][MAX] = {0};
+        printf("Enter number of edges: ");
+        scanf("%d", &E);
+        printf("Enter edges (src dest weight):\n");
+        for (int i = 0; i < E; i++) {
             int u, v, w;
             scanf("%d %d %d", &u, &v, &w);
-            if (u == -1 && v == -1 && w == -1) break;
-            addEdgeList(adj, u, v, w);
-            addEdgeList(adj, v, u, w); // undirected
+            graph[u][v] = w;
+            graph[v][u] = w;
         }
-        kruskalList(adj, n);
+        kruskalMatrix(graph, V);
+    } else if (choice == 2) {
+        struct Node* adj[MAX] = {NULL};
+        printf("Enter number of edges: ");
+        scanf("%d", &E);
+        printf("Enter edges (src dest weight):\n");
+        for (int i = 0; i < E; i++) {
+            int u, v, w;
+            scanf("%d %d %d", &u, &v, &w);
+            addEdge(adj, u, v, w);
+        }
+        kruskalList(adj, V);
     } else {
         printf("Invalid choice!\n");
     }
+
     return 0;
 }
