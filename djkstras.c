@@ -1,113 +1,155 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <limits.h>
+
 #define MAX 100
-#define INF INT_MAX
-typedef struct AdjNode {
-    int vertex, weight;
-    struct AdjNode* next;
-} AdjNode;
-void addEdgeList(AdjNode* adj[], int u, int v, int w) {
-    AdjNode* newNode = (AdjNode*)malloc(sizeof(AdjNode));
-    newNode->vertex = v;
-    newNode->weight = w;
-    newNode->next = adj[u];
-    adj[u] = newNode;
+
+// Structure for adjacency list node
+struct Node {
+    int dest, weight;
+    struct Node* next;
+};
+
+// Create a new list node
+struct Node* createNode(int dest, int weight) {
+    struct Node* newNode = (struct Node*)malloc(sizeof(struct Node));
+    newNode->dest = dest;
+    newNode->weight = weight;
+    newNode->next = NULL;
+    return newNode;
 }
-int minDistance(int dist[], int sptSet[], int n) {
-    int min = INF, min_index = -1;
-    for (int v = 0; v < n; v++)
-        if (!sptSet[v] && dist[v] <= min) {
+
+// Add edge to adjacency list
+void addEdgeList(struct Node* adj[], int u, int v, int w) {
+    struct Node* node = createNode(v, w);
+    node->next = adj[u];
+    adj[u] = node;
+
+    node = createNode(u, w);
+    node->next = adj[v];
+    adj[v] = node;
+}
+
+// Find vertex with minimum key value
+int minDistance(int dist[], bool visited[], int V) {
+    int min = INT_MAX, min_index;
+    for (int v = 0; v < V; v++) {
+        if (!visited[v] && dist[v] < min) {
             min = dist[v];
             min_index = v;
         }
+    }
     return min_index;
 }
-// Dijkstra with adjacency matrix
-void dijkstraMatrix(int n, int graph[n][n], int src) {
-    int dist[n], sptSet[n];
-    for (int i = 0; i < n; i++) {
-        dist[i] = INF;
-        sptSet[i] = 0;
-    }
-    dist[src] = 0;
-    for (int count = 0; count < n - 1; count++) {
-        int u = minDistance(dist, sptSet, n);
-        sptSet[u] = 1;
 
-        for (int v = 0; v < n; v++)
-            if (!sptSet[v] && graph[u][v] && dist[u] != INF && dist[u] + graph[u][v] < dist[v])
-                dist[v] = dist[u] + graph[u][v];
+// Dijkstra using adjacency matrix
+void dijkstraMatrix(int graph[MAX][MAX], int V, int src) {
+    int dist[MAX];
+    bool visited[MAX];
+
+    for (int i = 0; i < V; i++) {
+        dist[i] = INT_MAX;
+        visited[i] = false;
     }
-    printf("Vertex\tDistance from Source %d\n", src);
-    for (int i = 0; i < n; i++)
-        printf("%d\t%d\n", i, dist[i]);
-}
-// Dijkstra with adjacency list
-void dijkstraList(AdjNode* adj[], int n, int src) {
-    int dist[n], sptSet[n];
-    for (int i = 0; i < n; i++) {
-        dist[i] = INF;
-        sptSet[i] = 0;
-    }
+
     dist[src] = 0;
-    for (int count = 0; count < n - 1; count++) {
-        int u = -1, min = INF;
-        for (int i = 0; i < n; i++)
-            if (!sptSet[i] && dist[i] < min) {
-                min = dist[i];
-                u = i;
+
+    for (int count = 0; count < V - 1; count++) {
+        int u = minDistance(dist, visited, V);
+        visited[u] = true;
+
+        for (int v = 0; v < V; v++) {
+            if (!visited[v] && graph[u][v] && dist[u] != INT_MAX &&
+                dist[u] + graph[u][v] < dist[v]) {
+                dist[v] = dist[u] + graph[u][v];
             }
-        if (u == -1) break;
-        sptSet[u] = 1;
-        for (AdjNode* curr = adj[u]; curr != NULL; curr = curr->next) {
-            int v = curr->vertex;
-            int w = curr->weight;
-            if (!sptSet[v] && dist[u] != INF && dist[u] + w < dist[v])
-                dist[v] = dist[u] + w;
         }
     }
+
     printf("Vertex\tDistance from Source %d\n", src);
-    for (int i = 0; i < n; i++)
+    for (int i = 0; i < V; i++) {
         printf("%d\t%d\n", i, dist[i]);
-}
-int main() {
-    int n, representation, source;
-    printf("Enter number of vertices: ");
-    scanf("%d", &n);
-    printf("Choose graph representation:\n1. Adjacency Matrix\n2. Adjacency List\n");
-    scanf("%d", &representation);
-    printf("Enter source vertex: ");
-    scanf("%d", &source);
-    switch (representation) {
-        case 1: {
-            int graph[n][n];
-            printf("Enter adjacency matrix (0 for no edge):\n");
-            for (int i = 0; i < n; i++)
-                for (int j = 0; j < n; j++) {
-                    scanf("%d", &graph[i][j]);
-                    if (graph[i][j] == 0) graph[i][j] = INF;
-                }
-            dijkstraMatrix(n, graph, source);
-            break;
-        }
-        case 2: {
-            AdjNode* adj[n];
-            for (int i = 0; i < n; i++) adj[i] = NULL;
-            printf("Enter edges (u v weight), -1 -1 -1 to stop:\n");
-            while (1) {
-                int u, v, w;
-                scanf("%d %d %d", &u, &v, &w);
-                if (u == -1 && v == -1 && w == -1) break;
-                addEdgeList(adj, u, v, w);
-                // For undirected graph, also add opposite edge:
-                addEdgeList(adj, v, u, w);
-            }
-            dijkstraList(adj, n, source);
-            break;
-        }
-        default:
-            printf("Invalid choice!\n");
     }
+}
+
+// Dijkstra using adjacency list
+void dijkstraList(struct Node* adj[], int V, int src) {
+    int dist[MAX];
+    bool visited[MAX];
+
+    for (int i = 0; i < V; i++) {
+        dist[i] = INT_MAX;
+        visited[i] = false;
+    }
+
+    dist[src] = 0;
+
+    for (int count = 0; count < V - 1; count++) {
+        int u = minDistance(dist, visited, V);
+        visited[u] = true;
+
+        struct Node* temp = adj[u];
+        while (temp != NULL) {
+            int v = temp->dest;
+            int weight = temp->weight;
+
+            if (!visited[v] && dist[u] != INT_MAX &&
+                dist[u] + weight < dist[v]) {
+                dist[v] = dist[u] + weight;
+            }
+
+            temp = temp->next;
+        }
+    }
+
+    printf("Vertex\tDistance from Source %d\n", src);
+    for (int i = 0; i < V; i++) {
+        printf("%d\t%d\n", i, dist[i]);
+    }
+}
+
+int main() {
+    int choice, V, E;
+    int graph[MAX][MAX] = {0};
+    struct Node* adj[MAX];
+    for (int i = 0; i < MAX; i++) adj[i] = NULL;
+
+    printf("Enter number of vertices: ");
+    scanf("%d", &V);
+
+    printf("Choose graph representation:\n1. Adjacency Matrix\n2. Adjacency List\nEnter choice: ");
+    scanf("%d", &choice);
+
+    printf("Enter number of edges: ");
+    scanf("%d", &E);
+    printf("Enter edges (src dest weight):\n");
+
+    for (int i = 0; i < E; i++) {
+        int u, v, w;
+        scanf("%d %d %d", &u, &v, &w);
+        u--; v--; // convert to 0-based index
+
+        if (choice == 1) {
+            graph[u][v] = w;
+            graph[v][u] = w;
+        } else {
+            addEdgeList(adj, u, v, w);
+        }
+    }
+
+    int src;
+    printf("Enter source vertex (1 to %d): ", V);
+    scanf("%d", &src);
+    src--; // Convert to 0-based
+
+    if (choice == 1) {
+        printf("\nDijkstra using Adjacency Matrix:\n");
+        dijkstraMatrix(graph, V, src);
+    } else {
+        printf("\nDijkstra using Adjacency List:\n");
+        dijkstraList(adj, V, src);
+    }
+
     return 0;
 }
